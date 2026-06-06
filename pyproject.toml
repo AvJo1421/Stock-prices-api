@@ -5,12 +5,19 @@ description = ""
 authors = [
     {name = "AvJo1421",email = "avjo2000@gmail.com"}
 ]
-requires-python = ">=3.13"
+requires-python = ">=3.13,<4.0"
 dependencies = [
     "fastapi (>=0.136.3,<0.137.0)",
     "uvicorn (>=0.48.0,<0.49.0)",
     "yfinance (>=1.4.1,<2.0.0)",
-    "pandas (>=3.0.3,<4.0.0)"
+    "pandas (>=3.0.3,<4.0.0)",
+    "requests (>=2.34.2,<3.0.0)",
+    "python-dotenv (>=1.2.2,<2.0.0)",
+    "massive (>=2.8.0,<3.0.0)",
+    "websockets (>=16.0,<17.0)",
+    "websocket-client (>=1.9.0,<2.0.0)",
+    "pyarrow (>=24.0.0,<25.0.0)",
+    "tzdata (>=2026.2,<2027.0)"
 ]
 
 
