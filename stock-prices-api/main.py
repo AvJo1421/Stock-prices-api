@@ -46,10 +46,11 @@ async def startup():
 
 
 def fetch_polygon_data(ticker: str):
-    """Fetch latest 15-min aggregated data from Polygon"""
-    url = f"https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/minute"
+    from datetime import date, timedelta
+    to_date = date.today().isoformat()
+    from_date = (date.today() - timedelta(days=1)).isoformat()
+    url = f"https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/minute/{from_date}/{to_date}"
     params = {
-        "timespan": "minute",
         "adjusted": "true",
         "sort": "desc",
         "limit": 100,
@@ -60,6 +61,8 @@ def fetch_polygon_data(ticker: str):
         if response.status_code == 200:
             data = response.json().get("results", [])
             return pd.DataFrame(data) if data else None
+        else:
+            logger.error(f"Polygon {ticker}: {response.status_code} {response.text[:200]}")
     except Exception as e:
         logger.error(f"Polygon fetch error for {ticker}: {e}")
     return None
