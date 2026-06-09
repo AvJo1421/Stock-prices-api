@@ -1,11 +1,11 @@
 import React from 'react'
 
-export default function PredictionCard({ data }) {
+export default function PredictionCard({ data, onClick }) {
   const { ticker, current_price, predicted_price, change_pct } = data
   const isUp = change_pct >= 0
 
   return (
-    <div className="card">
+    <div className="card" onClick={onClick} style={{ cursor: 'pointer' }}>
       <div className="card-header">
         <h2>{ticker}</h2>
         <span className={`badge ${isUp ? 'up' : 'down'}`}>

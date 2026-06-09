@@ -1,12 +1,12 @@
+import sys
 import pandas as pd
 import numpy as np
-import mlflow
-import mlflow.xgboost
 from xgboost import XGBRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import joblib
 import warnings
 
+sys.stdout.reconfigure(encoding='utf-8')
 warnings.filterwarnings("ignore")
 
 # Load featured data
@@ -28,43 +28,29 @@ X_train, X_test = X[:split_idx], X[split_idx:]
 y_train, y_test = y[:split_idx], y[split_idx:]
 
 print(f"Train: {X_train.shape}, Test: {X_test.shape}")
+print(f"Feature cols: {feature_cols}")
 
-# MLflow experiment
-mlflow.set_experiment("stock_price_prediction")
+# Train model
+model = XGBRegressor(
+    n_estimators=100,
+    max_depth=6,
+    learning_rate=0.1,
+    random_state=42,
+    verbosity=0
+)
+model.fit(X_train, y_train, eval_set=[(X_test, y_test)], verbose=False)
 
-with mlflow.start_run():
-    # Train model
-    model = XGBRegressor(
-        n_estimators=100,
-        max_depth=6,
-        learning_rate=0.1,
-        random_state=42,
-        verbosity=0
-    )
-    model.fit(X_train, y_train, eval_set=[(X_test, y_test)], verbose=False)
+# Predictions & metrics
+y_pred = model.predict(X_test)
+mae  = mean_absolute_error(y_test, y_pred)
+rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+r2   = r2_score(y_test, y_pred)
 
-    # Predictions
-    y_pred = model.predict(X_test)
+print(f"\nMetrics:")
+print(f"MAE:  ${mae:.2f}")
+print(f"RMSE: ${rmse:.2f}")
+print(f"R2:   {r2:.4f}")
 
-    # Metrics
-    mae = mean_absolute_error(y_test, y_pred)
-    rmse = np.sqrt(mean_squared_error(y_test, y_pred))
-    r2 = r2_score(y_test, y_pred)
-
-    print(f"\nMetrics:")
-    print(f"MAE:  ${mae:.2f}")
-    print(f"RMSE: ${rmse:.2f}")
-    print(f"R²:   {r2:.4f}")
-
-    # Log to MLflow
-    mlflow.log_param("n_estimators", 100)
-    mlflow.log_param("max_depth", 6)
-    mlflow.log_param("learning_rate", 0.1)
-    mlflow.log_metric("mae", mae)
-    mlflow.log_metric("rmse", rmse)
-    mlflow.log_metric("r2", r2)
-
-    # Save model
-    joblib.dump(model, "stock_price_model.pkl")
-    mlflow.xgboost.log_model(model, "model")
-    print("\nModel saved: stock_price_model.pkl")
+# Save model + feature column order together
+joblib.dump({"model": model, "feature_cols": feature_cols}, "stock_price_model.pkl")
+print("\nModel saved: stock_price_model.pkl")

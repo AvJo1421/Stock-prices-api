@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import PredictionCard from './PredictionCard'
+import TickerModal from './TickerModal'
 import './App.css'
 
 export default function App() {
   const [predictions, setPredictions] = useState({})
   const [connected, setConnected] = useState(false)
   const [lastUpdate, setLastUpdate] = useState(null)
+  const [selectedTicker, setSelectedTicker] = useState(null)
 
   useEffect(() => {
     let ws
@@ -57,10 +59,21 @@ export default function App() {
           <div className="loading">Waiting for predictions...</div>
         ) : (
           Object.values(predictions).map(pred => (
-            <PredictionCard key={pred.ticker} data={pred} />
+            <PredictionCard
+              key={pred.ticker}
+              data={pred}
+              onClick={() => setSelectedTicker(pred.ticker)}
+            />
           ))
         )}
       </div>
+
+      {selectedTicker && (
+        <TickerModal
+          ticker={selectedTicker}
+          onClose={() => setSelectedTicker(null)}
+        />
+      )}
     </div>
   )
 }

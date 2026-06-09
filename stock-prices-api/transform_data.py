@@ -1,4 +1,6 @@
+import sys
 import pandas as pd
+sys.stdout.reconfigure(encoding='utf-8')
 
 # Load raw data (bronze layer)
 df = pd.read_parquet("data_raw.parquet")

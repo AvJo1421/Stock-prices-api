@@ -1,8 +1,11 @@
 import os
+import sys
 import requests
 import pandas as pd
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+
+sys.stdout.reconfigure(encoding='utf-8')
 
 load_dotenv()
 API_KEY = os.getenv("POLYGON_API_KEY")
