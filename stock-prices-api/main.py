@@ -10,6 +10,7 @@ import requests
 import joblib
 from fastapi import FastAPI, WebSocket, HTTPException
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 import logging
 
 sys.stdout.reconfigure(encoding='utf-8')
@@ -18,6 +19,13 @@ POLYGON_API_KEY = os.getenv("POLYGON_API_KEY")
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Stock Price Prediction API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://localhost:3001"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Global state
 model = None
@@ -193,10 +201,12 @@ async def get_history(ticker: str, bars: int = 200):
     """Return actual vs predicted price series for charting."""
     from datetime import date, timedelta
     to_date = date.today().isoformat()
-    from_date = (date.today() - timedelta(days=5)).isoformat()
+    from_date = (date.today() - timedelta(days=7)).isoformat()
 
+    # Fetch extra bars so rolling windows (50) have enough data after dropna
+    fetch_limit = max(bars + 100, 300)
     url = f"https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/minute/{from_date}/{to_date}"
-    params = {"adjusted": "true", "sort": "asc", "limit": bars, "apiKey": POLYGON_API_KEY}
+    params = {"adjusted": "true", "sort": "asc", "limit": fetch_limit, "apiKey": POLYGON_API_KEY}
 
     try:
         response = requests.get(url, params=params, timeout=15)
@@ -230,6 +240,9 @@ async def get_history(ticker: str, bars: int = 200):
     if len(df) < 5:
         raise HTTPException(status_code=400, detail="Insufficient data after feature engineering")
 
+    # Trim to requested bar count
+    df = df.tail(bars).reset_index(drop=True)
+
     X = df[feature_cols].values
     predictions = model.predict(X)
 
@@ -248,6 +261,105 @@ async def get_history(ticker: str, bars: int = 200):
         })
 
     return {"ticker": ticker, "data": result}
+
+
+def _engineer_features_df(df: pd.DataFrame) -> pd.DataFrame:
+    """Apply feature engineering to a daily OHLCV DataFrame in place."""
+    df["return"]         = df["close"].pct_change()
+    df["log_return"]     = np.log(df["close"] / df["close"].shift(1))
+    df["rolling_vol_20"] = df["return"].rolling(20).std()
+    df["rolling_vol_50"] = df["return"].rolling(50).std()
+    df["volume_zscore"]  = (df["volume"] - df["volume"].rolling(20).mean()) / df["volume"].rolling(20).std()
+    df["sma_20"]         = df["close"].rolling(20).mean()
+    df["sma_50"]         = df["close"].rolling(50).mean()
+    df["momentum"]       = df["sma_20"] - df["sma_50"]
+    df["intraday_range"] = (df["high"] - df["low"]) / df["close"]
+    df["price_zscore"]   = (df["close"] - df["close"].rolling(20).mean()) / df["close"].rolling(20).std()
+    return df
+
+
+@app.get("/forecast/{ticker}")
+async def get_forecast(ticker: str, days: int = 10):
+    """Recursive 10-day price forecast using daily bars."""
+    from datetime import date, timedelta
+    import math
+
+    to_date   = date.today().isoformat()
+    from_date = (date.today() - timedelta(days=120)).isoformat()  # ~90 trading days
+
+    url = f"https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{from_date}/{to_date}"
+    params = {"adjusted": "true", "sort": "asc", "limit": 120, "apiKey": POLYGON_API_KEY}
+
+    try:
+        resp = requests.get(url, params=params, timeout=15)
+        if resp.status_code != 200 or not resp.json().get("results"):
+            raise HTTPException(status_code=404, detail="No daily data from Polygon")
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+    df = pd.DataFrame(resp.json()["results"])
+    df = df.rename(columns={
+        "v": "volume", "vw": "vwap", "o": "open",
+        "c": "close",  "h": "high", "l": "low",
+        "t": "timestamp", "n": "transactions"
+    })
+    df = df.sort_values("timestamp").reset_index(drop=True)
+    df = _engineer_features_df(df)
+    df = df.dropna().reset_index(drop=True)
+
+    if len(df) < 5:
+        raise HTTPException(status_code=400, detail="Not enough daily data")
+
+    # --- Historical section: actual vs model on past bars ---
+    history = []
+    for _, row in df.iterrows():
+        X = np.array([[row.get(c, 0) for c in feature_cols]])
+        pred = float(model.predict(X)[0])
+        history.append({
+            "date":      datetime.utcfromtimestamp(row["timestamp"] / 1000).strftime("%b %d"),
+            "actual":    round(float(row["close"]), 2),
+            "predicted": round(pred, 2),
+            "forecast":  None,
+        })
+
+    # --- Recursive forecast: extend for `days` trading days ---
+    # Use last 60 rows as rolling window buffer
+    buf = df.copy()
+    last_ts = buf["timestamp"].iloc[-1]
+    ONE_DAY_MS = 86_400_000
+
+    forecast = []
+    for i in range(1, days + 1):
+        # Skip weekends
+        next_ts = last_ts + ONE_DAY_MS * i
+        next_date = datetime.utcfromtimestamp(next_ts / 1000)
+        while next_date.weekday() >= 5:
+            i += 1
+            next_ts = last_ts + ONE_DAY_MS * i
+            next_date = datetime.utcfromtimestamp(next_ts / 1000)
+
+        # Predict from last row of buffer
+        last_row = _engineer_features_df(buf.copy()).iloc[-1]
+        X = np.array([[last_row.get(c, 0) for c in feature_cols]])
+        pred_close = float(model.predict(X)[0])
+
+        # Append synthetic row to buffer (use predicted close, carry other values)
+        new_row = buf.iloc[-1].copy()
+        new_row["timestamp"] = next_ts
+        new_row["close"]     = pred_close
+        new_row["open"]      = pred_close
+        new_row["high"]      = pred_close * 1.005
+        new_row["low"]       = pred_close * 0.995
+        buf = pd.concat([buf, pd.DataFrame([new_row])], ignore_index=True)
+
+        forecast.append({
+            "date":      next_date.strftime("%b %d"),
+            "actual":    None,
+            "predicted": None,
+            "forecast":  round(pred_close, 2),
+        })
+
+    return {"ticker": ticker, "history": history, "forecast": forecast}
 
 
 @app.websocket("/ws/predictions")
