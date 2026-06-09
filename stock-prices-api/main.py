@@ -1,5 +1,6 @@
 import asyncio
 import os
+import sys
 import json
 from datetime import datetime
 from dotenv import load_dotenv
@@ -11,6 +12,7 @@ from fastapi import FastAPI, WebSocket, HTTPException
 from fastapi.responses import JSONResponse
 import logging
 
+sys.stdout.reconfigure(encoding='utf-8')
 load_dotenv()
 POLYGON_API_KEY = os.getenv("POLYGON_API_KEY")
 logger = logging.getLogger(__name__)

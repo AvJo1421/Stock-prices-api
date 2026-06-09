@@ -8,33 +8,37 @@ export default function App() {
   const [lastUpdate, setLastUpdate] = useState(null)
 
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:8000/ws/predictions')
+    let ws
+    let retryTimeout
 
-    ws.onopen = () => {
-      setConnected(true)
-      console.log('✅ Connected to WebSocket')
+    function connect() {
+      ws = new WebSocket('ws://localhost:8000/ws/predictions')
+
+      ws.onopen = () => {
+        setConnected(true)
+        console.log('✅ Connected to WebSocket')
+      }
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data)
+        setPredictions(prev => ({ ...prev, [data.ticker]: data }))
+        setLastUpdate(new Date().toLocaleTimeString())
+      }
+
+      ws.onerror = () => setConnected(false)
+
+      ws.onclose = () => {
+        setConnected(false)
+        console.log('❌ Disconnected — retrying in 5s...')
+        retryTimeout = setTimeout(connect, 5000)
+      }
     }
 
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data)
-      setPredictions(prev => ({
-        ...prev,
-        [data.ticker]: data
-      }))
-      setLastUpdate(new Date().toLocaleTimeString())
+    connect()
+    return () => {
+      clearTimeout(retryTimeout)
+      ws.close()
     }
-
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error)
-      setConnected(false)
-    }
-
-    ws.onclose = () => {
-      setConnected(false)
-      console.log('❌ Disconnected')
-    }
-
-    return () => ws.close()
   }, [])
 
   return (

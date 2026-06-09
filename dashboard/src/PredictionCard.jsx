@@ -19,7 +19,7 @@ export default function PredictionCard({ data }) {
           <span className="price">${current_price.toFixed(2)}</span>
         </div>
 
-        <div className="arrow">{isUp ? '→' : '←'}</div>
+        <div className="arrow">{isUp ? '↑' : '↓'}</div>
 
         <div className="price-item">
           <label>Predicted</label>
@@ -30,7 +30,10 @@ export default function PredictionCard({ data }) {
       <div className="confidence">
         <span className="confidence-label">Confidence</span>
         <div className="confidence-bar">
-          <div className={`confidence-fill ${Math.abs(change_pct) > 2 ? 'high' : 'medium'}`}></div>
+          <div
+            className={`confidence-fill ${Math.abs(change_pct) > 2 ? 'high' : 'medium'}`}
+            style={{ width: `${Math.min(50 + Math.abs(change_pct) * 10, 100)}%` }}
+          ></div>
         </div>
       </div>
     </div>
