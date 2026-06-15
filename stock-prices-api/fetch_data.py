@@ -10,9 +10,8 @@ sys.stdout.reconfigure(encoding='utf-8')
 load_dotenv()
 API_KEY = os.getenv("POLYGON_API_KEY")
 
-end_date = datetime.today().strftime("%Y-%m-%d")
-start_date = (datetime.today() - timedelta(days=730)).strftime("%Y-%m-%d")
-
+start_date = "2026-01-01"
+end_date = datetime.now().strftime("%Y-%m-%d")
 print(f"Fetching from {start_date} to {end_date}\n")
 
 WATCHLIST = {
