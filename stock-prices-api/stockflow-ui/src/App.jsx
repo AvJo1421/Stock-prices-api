@@ -72,7 +72,7 @@ function Researcher() {
     setLoading(true)
     setAnswer("")
 
-    const res = await fetch("http://127.0.0.1:8000/research", {
+    const res = await fetch("https://stockflow-api-een5pcjcrq-nw.a.run.app/research", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ question: query })
@@ -184,30 +184,31 @@ function Podcast() {
   }
 
   const start = async () => {
-    if (!topic.trim()) return
-    setRunning(true)
-    setTranscript([])
-    setPaused(false)
+  if (!topic.trim()) return
+  setRunning(true)
+  setTranscript([])
+  setPaused(false)
 
-    const res = await fetch("http://127.0.0.1:8000/podcast", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ topic, duration_minutes: duration })
-    })
+  const res = await fetch("https://stockflow-api-een5pcjcrq-nw.a.run.app/podcast", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ topic, duration_minutes: duration })
+  })
 
-    const data = await res.json()
-    const voices = await getVoices()
-    const female = voices.find(v => v.name.includes("Female") || v.name.includes("Samantha") || v.name.includes("Zira")) || voices[0]
-    const male = voices.find(v => v.name.includes("Male") || v.name.includes("David") || v.name.includes("Mark")) || voices[1]
+  const data = await res.json()
+  const voices = await getVoices()
+  const female = voices.find(v => v.name.includes("Female") || v.name.includes("Samantha") || v.name.includes("Zira")) || voices[0]
+  const male = voices.find(v => v.name.includes("Male") || v.name.includes("David") || v.name.includes("Mark")) || voices[1]
 
-    for (const turn of data.conversation) {
-      setTranscript(prev => [...prev, turn])
-      const voice = turn.speaker === "Host" ? female : male
-      await speak(turn.text, voice)
-    }
-
-    setRunning(false)
+  for (const turn of data.conversation) {
+    setTranscript(prev => [...prev, turn])
+    const voice = turn.speaker === "Host" ? female : male
+    await speak(turn.text, voice)
   }
+
+  setRunning(false)
+}
+
 
   return (
     <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">

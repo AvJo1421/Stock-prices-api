@@ -1,0 +1,12 @@
+chroma_db/
+chroma_news/
+stockflow-ui/
+data_raw.csv
+data_raw.parquet
+data_clean.csv
+data_featured.csv
+data_featured.parquet
+__pycache__/
+*.pyc
+.env
+.git/

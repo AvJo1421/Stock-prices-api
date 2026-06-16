@@ -8,6 +8,29 @@ import chromadb
 from langchain_anthropic import ChatAnthropic
 from langchain_experimental.agents.agent_toolkits import create_pandas_dataframe_agent
 
+from google.cloud import storage
+import os
+
+def download_from_gcs():
+    client = storage.Client()
+    bucket = client.bucket("stockflow-data")
+
+    # Download parquet
+    if not os.path.exists("data_clean.parquet"):
+        bucket.blob("data_clean.parquet").download_to_filename("data_clean.parquet")
+        print("Downloaded data_clean.parquet")
+
+    # Download chroma_news
+    if not os.path.exists("chroma_news"):
+        blobs = client.list_blobs("stockflow-data", prefix="chroma_news/")
+        for blob in blobs:
+            local_path = blob.name
+            os.makedirs(os.path.dirname(local_path), exist_ok=True)
+            blob.download_to_filename(local_path)
+        print("Downloaded chroma_news")
+
+download_from_gcs()
+
 load_dotenv()
 
 app = FastAPI()
@@ -16,7 +39,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        "https://stockflow-deployment.web.app"
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
