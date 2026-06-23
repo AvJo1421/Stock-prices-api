@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useRef } from "react"
 
 export default function App() {
   const [activeCard, setActiveCard] = useState(null)
@@ -16,7 +16,7 @@ export default function App() {
       {/* Main */}
       <main className="px-8 py-12">
         {/* Cards */}
-        <div className="grid grid-cols-2 gap-6 max-w-3xl mx-auto">
+        <div className="grid grid-cols-4 gap-6 max-w-5xl mx-auto">
           <Card
             title="Stock Researcher"
             description="Ask anything about your watchlist using AI"
@@ -31,12 +31,28 @@ export default function App() {
             onClick={() => setActiveCard("podcast")}
             active={activeCard === "podcast"}
           />
+          <Card
+            title="Watchlist"
+            description="Live prices across your portfolio"
+            icon="📊"
+            onClick={() => setActiveCard("watchlist")}
+            active={activeCard === "watchlist"}
+          />
+          <Card
+            title="News Feed"
+            description="Latest stock related news"
+            icon="📰"
+            onClick={() => setActiveCard("news")}
+            active={activeCard === "news"}
+          />
         </div>
 
         {/* Active Panel */}
-        <div className="max-w-5xl mx-auto mt-10">
+        <div className="max-w-7xl mx-auto mt-10">
           {activeCard === "researcher" && <Researcher />}
           {activeCard === "podcast" && <Podcast />}
+          {activeCard === "watchlist" && <Watchlist />}
+          {activeCard === "news" && <NewsFeed />}
         </div>
       </main>
     </div>
@@ -62,25 +78,30 @@ function Card({ title, description, icon, onClick, active }) {
 
 function Researcher() {
   const [question, setQuestion] = useState("")
-  const [answer, setAnswer] = useState("")
   const [loading, setLoading] = useState(false)
   const [listening, setListening] = useState(false)
+  const [chatHistory, setChatHistory] = useState([])
 
   const ask = async (q) => {
     const query = q || question
     if (!query.trim()) return
     setLoading(true)
-    setAnswer("")
+    setQuestion("")
 
     const res = await fetch("https://stockflow-api-een5pcjcrq-nw.a.run.app/research", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question: query })
+      body: JSON.stringify({ question: query, chat_history: chatHistory })
     })
 
     const data = await res.json()
-    setAnswer(data.answer)
     setLoading(false)
+
+    setChatHistory(prev => [
+      ...prev,
+      { role: "user", content: query },
+      { role: "assistant", content: data.answer }
+    ])
 
     const utterance = new SpeechSynthesisUtterance(data.answer)
     window.speechSynthesis.speak(utterance)
@@ -133,9 +154,17 @@ function Researcher() {
         </button>
       </div>
 
-      {answer && (
-        <div className="mt-6 p-4 bg-gray-800 rounded-lg text-gray-200 leading-relaxed">
-          {answer}
+      {chatHistory.length > 0 && (
+        <div className="space-y-3 mt-6">
+          {chatHistory.map((msg, i) => (
+            <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+              <div className={`max-w-2xl px-4 py-2 rounded-lg text-sm ${
+                msg.role === "user" ? "bg-blue-900 text-blue-100" : "bg-gray-800 text-gray-200"
+              }`}>
+                {msg.content}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -148,67 +177,53 @@ function Podcast() {
   const [running, setRunning] = useState(false)
   const [transcript, setTranscript] = useState([])
   const [paused, setPaused] = useState(false)
+  const audioRef = useRef(null)
 
-  const getVoices = () => {
+  const playAudio = (base64Audio) => {
     return new Promise(resolve => {
-      let voices = window.speechSynthesis.getVoices()
-      if (voices.length) {
-        resolve(voices)
-      } else {
-        window.speechSynthesis.onvoiceschanged = () => {
-          voices = window.speechSynthesis.getVoices()
-          resolve(voices)
-        }
+      if (!base64Audio) {
+        resolve()
+        return
       }
-    })
-  }
-
-  const speak = (text, voice) => {
-    return new Promise(resolve => {
-      const utterance = new SpeechSynthesisUtterance(text)
-      utterance.voice = voice
-      utterance.rate = 1.0
-      utterance.onend = resolve
-      window.speechSynthesis.speak(utterance)
+      const audio = new Audio(`data:audio/mpeg;base64,${base64Audio}`)
+      audioRef.current = audio
+      audio.onended = resolve
+      audio.play()
     })
   }
 
   const togglePause = () => {
+    if (!audioRef.current) return
     if (paused) {
-      window.speechSynthesis.resume()
+      audioRef.current.play()
       setPaused(false)
     } else {
-      window.speechSynthesis.pause()
+      audioRef.current.pause()
       setPaused(true)
     }
   }
 
   const start = async () => {
-  if (!topic.trim()) return
-  setRunning(true)
-  setTranscript([])
-  setPaused(false)
+    if (!topic.trim()) return
+    setRunning(true)
+    setTranscript([])
+    setPaused(false)
 
-  const res = await fetch("https://stockflow-api-een5pcjcrq-nw.a.run.app/podcast", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ topic, duration_minutes: duration })
-  })
+    const res = await fetch("https://stockflow-api-een5pcjcrq-nw.a.run.app/podcast", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topic, duration_minutes: duration })
+    })
 
-  const data = await res.json()
-  const voices = await getVoices()
-  const female = voices.find(v => v.name.includes("Female") || v.name.includes("Samantha") || v.name.includes("Zira")) || voices[0]
-  const male = voices.find(v => v.name.includes("Male") || v.name.includes("David") || v.name.includes("Mark")) || voices[1]
+    const data = await res.json()
 
-  for (const turn of data.conversation) {
-    setTranscript(prev => [...prev, turn])
-    const voice = turn.speaker === "Host" ? female : male
-    await speak(turn.text, voice)
+    for (const turn of data.conversation) {
+      setTranscript(prev => [...prev, turn])
+      await playAudio(turn.audio)
+    }
+
+    setRunning(false)
   }
-
-  setRunning(false)
-}
-
 
   return (
     <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
@@ -258,6 +273,136 @@ function Podcast() {
                 <span className="font-semibold text-xs opacity-70">{turn.speaker}</span>
                 <p className="mt-1">{turn.text}</p>
               </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Watchlist() {
+  const [data, setData] = useState([])
+  const [lastUpdated, setLastUpdated] = useState(null)
+  const [loading, setLoading] = useState(false)
+
+  const fetchPrices = async () => {
+    setLoading(true)
+    const res = await fetch("https://stockflow-api-een5pcjcrq-nw.a.run.app/watchlist")
+    const result = await res.json()
+    setData(result.data)
+    setLastUpdated(new Date(result.fetched_at))
+    setLoading(false)
+  }
+
+  return (
+    <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
+      <div className="flex items-center justify-between mb-5">
+        <h2 className="text-xl font-semibold">Watchlist</h2>
+        <div className="flex items-center gap-4">
+          {lastUpdated && (
+            <span className="text-xs text-gray-500">
+              Last updated: {lastUpdated.toLocaleTimeString("en-GB")} BST
+            </span>
+          )}
+          <button
+            onClick={fetchPrices}
+            disabled={loading}
+            className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+          >
+            {loading ? "Refreshing..." : "🔄 Refresh"}
+          </button>
+        </div>
+      </div>
+
+      {data.length === 0 ? (
+        <p className="text-gray-500 text-sm">Click refresh to load prices</p>
+      ) : (
+        <div className="grid grid-cols-8 gap-3">
+          {data.map(stock => {
+            const isUp = stock.change_pct > 0
+            const isDown = stock.change_pct < 0
+            return (
+              <div
+                key={stock.ticker}
+                className="bg-gray-800 rounded-lg p-4 hover:bg-gray-750 transition-colors border border-gray-700/50"
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <div className="font-bold text-sm text-white">{stock.ticker}</div>
+                    <div className="text-xs text-gray-400 truncate max-w-[100px]">{stock.name}</div>
+                  </div>
+                  <span className="text-[9px] bg-gray-700 text-gray-300 px-2 py-0.5 rounded-full whitespace-nowrap">
+                    {stock.sector}
+                  </span>
+                </div>
+                <div className="flex items-baseline justify-between mt-3">
+                  <span className="text-lg font-bold text-white">${stock.close.toFixed(2)}</span>
+                  <span className={`text-xs font-semibold ${
+                    isUp ? "text-green-400" : isDown ? "text-red-400" : "text-gray-500"
+                  }`}>
+                    {isUp ? "▲" : isDown ? "▼" : "—"} {Math.abs(stock.change_pct).toFixed(2)}%
+                  </span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function NewsFeed() {
+  const [news, setNews] = useState([])
+  const [loading, setLoading] = useState(false)
+
+  const fetchNews = async () => {
+    setLoading(true)
+    const res = await fetch("https://stockflow-api-een5pcjcrq-nw.a.run.app/news")
+    const data = await res.json()
+    setNews(data.news)
+    setLoading(false)
+  }
+
+  const formatDate = (utc) => {
+    const date = new Date(utc)
+    return date.toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+  }
+
+  return (
+    <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
+      <div className="flex items-center justify-between mb-5">
+        <h2 className="text-xl font-semibold">Latest News</h2>
+        <button
+          onClick={fetchNews}
+          disabled={loading}
+          className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+        >
+          {loading ? "Loading..." : "🔄 Refresh"}
+        </button>
+      </div>
+
+      {news.length === 0 ? (
+        <p className="text-gray-500 text-sm">No news available</p>
+      ) : (
+        <div className="space-y-3">
+          {news.map((item, i) => (
+            <div key={i} className="bg-gray-800 rounded-lg p-4 border border-gray-700/50 hover:bg-gray-750 transition-colors">
+             <div className="flex items-start justify-between gap-3">
+                <a
+                  href={`https://www.google.com/search?q=${encodeURIComponent(item.title)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-gray-200 flex-1 hover:text-blue-400 hover:underline"
+                >
+                  {item.title}
+                </a>
+                <span className="text-[10px] bg-blue-900 text-blue-300 px-2 py-0.5 rounded-full whitespace-nowrap">
+                  {item.ticker}
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">{formatDate(item.published_utc)}</p>
             </div>
           ))}
         </div>

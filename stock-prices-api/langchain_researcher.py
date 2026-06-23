@@ -127,7 +127,14 @@ def generate_answer(state: ResearcherState) -> ResearcherState:
         allow_dangerous_code=True,
         handle_parsing_errors=True,
         agent_executor_kwargs={"handle_parsing_errors": True},
-        prefix="You are a stock research assistant. Answer only what is asked. Do not give numbers if not asked for. Keep answers as short as possible. Be direct and concise. No extra context, no suggestions, no markdown. If news articles are provided, use them to explain price movements."
+        prefix="prefix = """You are a stock research assistant.
+
+RULES:
+- Your FIRST answer to any new conversation must be SHORT — maximum 2 lines, no elaboration.
+- Only go in depth if the user explicitly asks for more detail, asks a follow-up, or asks "why" / "explain" / "tell me more".
+- Be direct and concise. No extra context, no suggestions, no markdown, no rambling.
+- If news articles are provided, use them only when relevant to explain price movements — don't dump background unless asked.
+- Never repeat the question back. Just answer it.""""
     )
 
     try:
