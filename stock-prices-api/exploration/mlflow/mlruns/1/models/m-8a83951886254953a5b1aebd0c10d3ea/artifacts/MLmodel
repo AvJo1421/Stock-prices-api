@@ -1,0 +1,22 @@
+artifact_path: file:D:/Atharva Professional/Portfolio/Stock_Prices_Api/stock-prices-api/mlruns/1/models/m-8a83951886254953a5b1aebd0c10d3ea/artifacts
+flavors:
+  python_function:
+    data: model.ubj
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.xgboost
+    python_version: 3.13.7
+  xgboost:
+    code: null
+    data: model.ubj
+    model_class: xgboost.sklearn.XGBRegressor
+    model_format: ubj
+    xgb_version: 3.1.2
+mlflow_version: 3.8.1
+model_id: m-8a83951886254953a5b1aebd0c10d3ea
+model_size_bytes: 460350
+model_uuid: m-8a83951886254953a5b1aebd0c10d3ea
+prompts: null
+run_id: 74e3d0c97b8342218985b5943aa93093
+utc_time_created: '2026-06-07 12:25:11.175281'

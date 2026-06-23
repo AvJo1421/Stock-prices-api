@@ -1,0 +1,5 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-f', 'Dockerfile.scheduler', '-t', 'europe-west2-docker.pkg.dev/stockflow-deployment/stockflow/scheduler:latest', '.']
+images:
+  - 'europe-west2-docker.pkg.dev/stockflow-deployment/stockflow/scheduler:latest'

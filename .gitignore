@@ -1,0 +1,7 @@
+# Large raw data files
+*.pcap.gz
+*.pcap
+
+# Node
+node_modules/
+package-lock.json

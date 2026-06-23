@@ -1,0 +1,20 @@
+﻿# Secrets
+.env
+
+# Data files
+*.parquet
+*.csv
+data_feeds*
+
+# Generated images
+*.png
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+chroma_db/
+chroma_news/
